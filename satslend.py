@@ -11,12 +11,17 @@ import requests
 import json
 
 BASE_URL = "https://satslend.services"
+TESTNET_URL = "https://satslend.services/testnet"
 
 class Bot:
-    def __init__(self, btc_address, eth_address, name="my-bot", role="both", referral_code="PHLAUNCH", api_key=None):
+    # Use testnet=True for free testing with no real money
+    # bot = Bot(btc_address="...", eth_address="...", testnet=True)
+    def __init__(self, btc_address, eth_address, name="my-bot", role="both", referral_code="PHLAUNCH", api_key=None, testnet=False):
         self.btc_address = btc_address
         self.eth_address = eth_address
         self.api_key = api_key
+        self.base_url = TESTNET_URL if testnet else BASE_URL
+        if testnet: print("[SATS.LEND] Running in TESTNET mode — no real money")
         self.bot_id = None
         self.referral_code_own = None
 
@@ -24,7 +29,7 @@ class Bot:
             self._register(name, role, referral_code)
 
     def _register(self, name, role, referral_code):
-        r = requests.post(f"{BASE_URL}/bots/register", json={
+        r = requests.post(f"{self.base_url}/bots/register", json={
             "name": name,
             "role": role,
             "btc_address": self.btc_address,
@@ -46,7 +51,7 @@ class Bot:
     # LENDER METHODS
     def lend(self, amount, rate, days=30, min_amount=100, min_days=1):
         """Post a lend order. Returns order_id."""
-        r = requests.post(f"{BASE_URL}/orders/lend",
+        r = requests.post(f"{self.base_url}/orders/lend",
             headers=self._headers,
             json={"amount_usd": amount, "interest_rate_pct": rate,
                   "max_duration_days": days, "min_duration_days": min_days,
@@ -57,13 +62,13 @@ class Bot:
 
     def cancel_order(self, order_id):
         """Cancel a lend order."""
-        r = requests.post(f"{BASE_URL}/orders/{order_id}/cancel", headers=self._headers)
+        r = requests.post(f"{self.base_url}/orders/{order_id}/cancel", headers=self._headers)
         return r.json()
 
     # BORROWER METHODS
     def borrow(self, amount, days=30, max_rate=10):
         """Request a loan. Returns loan details including escrow_address."""
-        r = requests.post(f"{BASE_URL}/loans/request",
+        r = requests.post(f"{self.base_url}/loans/request",
             headers=self._headers,
             json={"amount_usd": amount, "duration_days": days,
                   "max_interest_rate_pct": max_rate})
@@ -76,7 +81,7 @@ class Bot:
 
     def repay(self, loan_id, usdc_txhash):
         """Repay a loan. BTC collateral returns automatically."""
-        r = requests.post(f"{BASE_URL}/loans/{loan_id}/repay",
+        r = requests.post(f"{self.base_url}/loans/{loan_id}/repay",
             headers=self._headers,
             json={"usdc_txhash": usdc_txhash})
         return r.json()
@@ -84,7 +89,7 @@ class Bot:
     # MONITORING
     def loan_status(self, loan_id):
         """Get loan status and LTV."""
-        r = requests.get(f"{BASE_URL}/loans/{loan_id}")
+        r = requests.get(f"{self.base_url}/loans/{loan_id}")
         data = r.json()
         loan = data.get("loan", {})
         print(f"[SATS.LEND] Loan {loan_id}: LTV {loan.get('ltv_pct')}% | State: {loan.get('state')} | Margin call: {loan.get('margin_call')}")
@@ -92,22 +97,22 @@ class Bot:
 
     def marketplace(self):
         """Browse open loan requests."""
-        r = requests.get(f"{BASE_URL}/marketplace")
+        r = requests.get(f"{self.base_url}/marketplace")
         return r.json()
 
     def orders(self):
         """Browse open lend orders."""
-        r = requests.get(f"{BASE_URL}/orders")
+        r = requests.get(f"{self.base_url}/orders")
         return r.json()
 
     def stats(self):
         """Get platform stats."""
-        r = requests.get(f"{BASE_URL}/platform/stats")
+        r = requests.get(f"{self.base_url}/platform/stats")
         return r.json()
 
     def referral(self):
         """Get your referral code and earnings."""
-        r = requests.post(f"{BASE_URL}/referral/generate", headers=self._headers)
+        r = requests.post(f"{self.base_url}/referral/generate", headers=self._headers)
         data = r.json()
         print(f"[SATS.LEND] Referral code: {data.get('referral_code')}")
         print(f"[SATS.LEND] Referral URL: {data.get('referral_url')}")
@@ -117,7 +122,7 @@ class Bot:
         """Check your referral earnings."""
         if not self.bot_id:
             return {}
-        r = requests.get(f"{BASE_URL}/referral/stats/{self.bot_id}")
+        r = requests.get(f"{self.base_url}/referral/stats/{self.bot_id}")
         data = r.json()
         print(f"[SATS.LEND] Referred: {data.get('total_referred')} bots | Earned: ${data.get('total_earned_usd',0):.2f}")
         return data
